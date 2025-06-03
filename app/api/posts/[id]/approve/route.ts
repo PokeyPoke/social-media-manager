@@ -11,7 +11,7 @@ const approvePostSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -22,9 +22,11 @@ export async function POST(
     const body = await request.json()
     const data = approvePostSchema.parse(body)
 
+    const { id } = await params
+    
     // Check if post exists
     const post = await prisma.post.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         campaign: {
           include: {
@@ -41,7 +43,7 @@ export async function POST(
     // Create approval record
     const approval = await prisma.approval.create({
       data: {
-        postId: params.id,
+        postId: id,
         userId: session.user!.id,
         action: data.action,
         notes: data.notes
@@ -70,7 +72,7 @@ export async function POST(
     }
 
     const updatedPost = await prisma.post.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: newStatus,
         ...updateData

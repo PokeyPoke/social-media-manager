@@ -26,7 +26,7 @@ const updateCampaignSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -34,8 +34,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const campaign = await prisma.campaign.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         company: true,
         posts: {
@@ -80,7 +81,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -91,8 +92,9 @@ export async function PUT(
     const body = await request.json()
     const data = updateCampaignSchema.parse(body)
 
+    const { id } = await params
     const campaign = await prisma.campaign.update({
-      where: { id: params.id },
+      where: { id },
       data,
       include: {
         company: true,
@@ -125,7 +127,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -133,8 +135,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     await prisma.campaign.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Campaign deleted successfully' })

@@ -17,7 +17,7 @@ const updatePostSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -25,8 +25,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const post = await prisma.post.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         campaign: {
           include: {
@@ -67,7 +68,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -78,9 +79,11 @@ export async function PUT(
     const body = await request.json()
     const data = updatePostSchema.parse(body)
 
+    const { id } = await params
+    
     // Get current post to check if content changed
     const currentPost = await prisma.post.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!currentPost) {
@@ -91,7 +94,7 @@ export async function PUT(
     if (data.finalContent) {
       await prisma.postRevision.create({
         data: {
-          postId: params.id,
+          postId: id,
           content: data.finalContent,
           reason: 'Manual edit'
         }
@@ -99,7 +102,7 @@ export async function PUT(
     }
 
     const post = await prisma.post.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...data,
         scheduledTime: data.scheduledTime ? new Date(data.scheduledTime) : undefined,
@@ -147,7 +150,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -155,8 +158,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     await prisma.post.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Post deleted successfully' })
