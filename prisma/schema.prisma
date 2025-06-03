@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  role          UserRole  @default(MANAGER)
+  permissions   String[]  @default([])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  approvals     Approval[]
+  @@map("users")
+}
+
+model Company {
+  id                   String     @id @default(cuid())
+  name                 String
+  facebookPageId       String?    @unique
+  accessTokenEncrypted String?
+  brandSettings        Json
+  defaultInstructions  String?
+  timezone             String     @default("UTC")
+  status               CompanyStatus @default(ACTIVE)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  
+  campaigns            Campaign[]
+  @@map("companies")
+}
+
+model Campaign {
+  id               String         @id @default(cuid())
+  companyId        String
+  name             String
+  description      String?
+  theme            String?
+  contentStrategy  Json
+  scheduleSettings Json
+  status           CampaignStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  posts            Post[]
+  
+  @@map("campaigns")
+}
+
+model Post {
+  id                   String         @id @default(cuid())
+  campaignId           String
+  aiGeneratedContent   Json
+  finalContent         Json?
+  status               PostStatus     @default(DRAFT)
+  scheduledTime        DateTime?
+  postedTime           DateTime?
+  facebookPostId       String?
+  engagementMetrics    Json?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  
+  campaign             Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  approvals            Approval[]
+  revisions            PostRevision[]
+  
+  @@map("posts")
+}
+
+model PostRevision {
+  id        String   @id @default(cuid())
+  postId    String
+  content   Json
+  reason    String?
+  createdAt DateTime @default(now())
+  
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  @@map("post_revisions")
+}
+
+model Approval {
+  id        String       @id @default(cuid())
+  postId    String
+  userId    String
+  action    ApprovalAction
+  notes     String?
+  timestamp DateTime     @default(now())
+  
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("approvals")
+}
+
+model ScheduledJob {
+  id          String    @id @default(cuid())
+  type        JobType
+  payload     Json
+  scheduledAt DateTime
+  executedAt  DateTime?
+  status      JobStatus @default(PENDING)
+  error       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("scheduled_jobs")
+}
+
+model Analytics {
+  id           String   @id @default(cuid())
+  postId       String?
+  companyId    String?
+  campaignId   String?
+  metricType   String
+  metricValue  Float
+  recordedAt   DateTime @default(now())
+  metadata     Json?
+  
+  @@map("analytics")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+  REQUESTED_CHANGES
+}
+
+enum JobType {
+  POST_CONTENT
+  FETCH_ANALYTICS
+  CLEANUP_OLD_DATA
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
