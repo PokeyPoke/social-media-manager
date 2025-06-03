@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "npx prisma generate && next build",
-    "start": "next start",
+    "start": "bash scripts/start.sh",
+    "start:next": "next start",
     "lint": "next lint",
     "db:migrate": "npx prisma migrate dev",
     "db:deploy": "npx prisma migrate deploy",
