@@ -1,0 +1,353 @@
+// IMPROVED PRISMA SCHEMA with security and performance enhancements
+// This file shows recommended improvements to the existing schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  role              UserRole  @default(MANAGER)
+  permissions       String[]  @default([])
+  
+  // Security enhancements
+  emailVerified     Boolean   @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  loginAttempts     Int       @default(0)
+  lockedUntil       DateTime?
+  
+  // Audit fields
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  approvals         Approval[]
+  sessions          UserSession[]
+  passwordResets    PasswordReset[]
+  
+  // Indexes for performance
+  @@index([email])
+  @@index([role])
+  @@index([emailVerified])
+  @@map("users")
+}
+
+// New model for session management
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  jti          String   @unique // JWT ID for token invalidation
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// New model for password reset tokens
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([expiresAt])
+  @@map("password_resets")
+}
+
+model Company {
+  id                   String        @id @default(cuid())
+  name                 String
+  slug                 String        @unique // For SEO-friendly URLs
+  
+  // Social media integration
+  facebookPageId       String?       @unique
+  accessTokenEncrypted String?
+  
+  // Configuration
+  brandSettings        Json          @default("{}")
+  defaultInstructions  String?
+  timezone             String        @default("UTC")
+  status               CompanyStatus @default(ACTIVE)
+  
+  // Audit fields
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  
+  // Relations
+  campaigns            Campaign[]
+  
+  // Indexes for performance
+  @@index([status])
+  @@index([slug])
+  @@index([facebookPageId])
+  @@map("companies")
+}
+
+model Campaign {
+  id               String         @id @default(cuid())
+  companyId        String
+  name             String
+  description      String?
+  theme            String?
+  
+  // Configuration stored as typed JSON
+  contentStrategy  Json           @default("{}")
+  scheduleSettings Json           @default("{}")
+  
+  // Enhanced status tracking
+  status           CampaignStatus @default(ACTIVE)
+  startDate        DateTime?
+  endDate          DateTime?
+  
+  // Audit fields
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  // Relations
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  posts            Post[]
+  
+  // Indexes for performance
+  @@index([companyId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("campaigns")
+}
+
+model Post {
+  id                   String         @id @default(cuid())
+  campaignId           String
+  
+  // Content management
+  aiGeneratedContent   Json
+  finalContent         Json?
+  contentVersion       Int            @default(1)
+  
+  // Status and scheduling
+  status               PostStatus     @default(DRAFT)
+  scheduledTime        DateTime?
+  postedTime           DateTime?
+  
+  // Social media integration
+  facebookPostId       String?
+  engagementMetrics    Json?
+  
+  // Performance tracking
+  impressions          Int?
+  clicks               Int?
+  engagementRate       Float?
+  
+  // Audit fields
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  
+  // Relations
+  campaign             Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  approvals            Approval[]
+  revisions            PostRevision[]
+  
+  // Indexes for performance
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledTime])
+  @@index([postedTime])
+  @@index([status, scheduledTime]) // Composite index for scheduled posts
+  @@map("posts")
+}
+
+model PostRevision {
+  id        String   @id @default(cuid())
+  postId    String
+  content   Json
+  reason    String?
+  version   Int
+  createdAt DateTime @default(now())
+  
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  @@index([postId])
+  @@index([postId, version]) // For version tracking
+  @@map("post_revisions")
+}
+
+model Approval {
+  id        String         @id @default(cuid())
+  postId    String
+  userId    String
+  action    ApprovalAction
+  notes     String?
+  timestamp DateTime       @default(now())
+  
+  post      Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Prevent duplicate approvals
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@index([action])
+  @@map("approvals")
+}
+
+model ScheduledJob {
+  id          String    @id @default(cuid())
+  type        JobType
+  payload     Json      @default("{}")
+  scheduledAt DateTime
+  executedAt  DateTime?
+  status      JobStatus @default(PENDING)
+  error       String?
+  retryCount  Int       @default(0)
+  maxRetries  Int       @default(3)
+  
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Indexes for job processing
+  @@index([status, scheduledAt])
+  @@index([type])
+  @@index([scheduledAt])
+  @@map("scheduled_jobs")
+}
+
+model Analytics {
+  id           String   @id @default(cuid())
+  postId       String?
+  companyId    String?
+  campaignId   String?
+  
+  // Metrics
+  metricType   String
+  metricValue  Float
+  
+  // Time-based tracking
+  recordedAt   DateTime @default(now())
+  date         DateTime // For daily aggregations
+  
+  // Additional context
+  metadata     Json?
+  
+  // Indexes for analytics queries
+  @@index([postId])
+  @@index([companyId])
+  @@index([campaignId])
+  @@index([metricType])
+  @@index([date])
+  @@index([metricType, date]) // Composite for time-series queries
+  @@map("analytics")
+}
+
+// New model for API rate limiting
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique // IP address or user ID
+  requests  Int      @default(1)
+  windowStart DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([key])
+  @@index([windowStart])
+  @@map("rate_limits")
+}
+
+// New model for audit logging
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+// Enhanced enums with additional statuses
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+  GUEST // For limited access
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TRIAL // For trial accounts
+}
+
+enum CampaignStatus {
+  DRAFT     // Being set up
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+  CANCELLED // Cancelled before completion
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  POSTED
+  FAILED
+  CANCELLED
+  EXPIRED   // For scheduled posts that weren't posted
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+  REQUESTED_CHANGES
+  DELEGATED // Forwarded to another approver
+}
+
+enum JobType {
+  POST_CONTENT
+  FETCH_ANALYTICS
+  CLEANUP_OLD_DATA
+  SEND_NOTIFICATIONS
+  BACKUP_DATA
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
