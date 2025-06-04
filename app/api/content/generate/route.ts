@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       includeHashtags: contentStrategy.includeHashtags !== false,
       includeEmojis: contentStrategy.includeEmojis !== false,
       maxLength: contentStrategy.maxLength || 280,
-      customInstructions: data.customInstructions || campaign.company.defaultInstructions
+      customInstructions: data.customInstructions || campaign.company.defaultInstructions || undefined
     }
 
     // Generate content variations
