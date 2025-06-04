@@ -12,7 +12,8 @@ const defaultSession: SessionData = {
 }
 
 export async function getSession() {
-  const session = await getIronSession<SessionData>(cookies(), {
+  const cookieStore = await cookies()
+  const session = await getIronSession<SessionData>(cookieStore, {
     password: process.env.SESSION_SECRET!,
     cookieName: 'social-media-manager-session',
     cookieOptions: {

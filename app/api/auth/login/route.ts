@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth'
 import { createSession } from '@/lib/session'
+import { withRateLimit, authRateLimit } from '@/lib/rate-limiting'
+import { asyncHandler } from '@/lib/error-handling'
 import { z } from 'zod'
 
 const loginSchema = z.object({
@@ -8,8 +10,8 @@ const loginSchema = z.object({
   password: z.string().min(6)
 })
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const body = await request.json()
     const { email, password } = loginSchema.parse(body)
 
@@ -36,11 +38,6 @@ export async function POST(request: NextRequest) {
         role: user.role
       }
     })
-  } catch (error) {
-    console.error('Login error:', error)
-    return NextResponse.json(
-      { error: 'Invalid request data' },
-      { status: 400 }
-    )
-  }
-}
+  }),
+  authRateLimit
+)

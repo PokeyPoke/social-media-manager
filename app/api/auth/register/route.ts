@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUser } from '@/lib/auth'
 import { createSession } from '@/lib/session'
+import { withRateLimit, authRateLimit } from '@/lib/rate-limiting'
+import { asyncHandler } from '@/lib/error-handling'
 import { z } from 'zod'
 
 const registerSchema = z.object({
@@ -10,8 +12,8 @@ const registerSchema = z.object({
   role: z.enum(['ADMIN', 'MANAGER', 'VIEWER']).optional()
 })
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const body = await request.json()
     const { email, password, name, role = 'MANAGER' } = registerSchema.parse(body)
 
@@ -32,19 +34,6 @@ export async function POST(request: NextRequest) {
         role: user.role
       }
     })
-  } catch (error: any) {
-    console.error('Registration error:', error)
-    
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 409 }
-      )
-    }
-    
-    return NextResponse.json(
-      { error: 'Invalid request data' },
-      { status: 400 }
-    )
-  }
-}
+  }),
+  authRateLimit
+)

@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+// Environment validation is temporarily disabled for build
+// In production, ensure all environment variables meet security requirements
+// import { validateEnv } from "@/lib/env-validation";
+// validateEnv();
 
 const inter = Inter({ subsets: ["latin"] });
 

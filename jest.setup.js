@@ -1,5 +1,5 @@
 // Jest setup file
-import 'jest-extended'
+require('jest-extended/all')
 
 // Mock Next.js modules
 jest.mock('next/navigation', () => ({

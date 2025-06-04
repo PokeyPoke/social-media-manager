@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { geminiAI } from '@/lib/gemini'
+import { withRateLimit, contentGenerationRateLimit } from '@/lib/rate-limiting'
+import { asyncHandler } from '@/lib/error-handling'
 import { z } from 'zod'
 
 const generateContentSchema = z.object({
@@ -12,8 +14,8 @@ const generateContentSchema = z.object({
   count: z.number().min(1).max(5).default(1)
 })
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const session = await getSession()
     if (!session.isLoggedIn) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
         prisma.post.create({
           data: {
             campaignId: data.campaignId,
-            aiGeneratedContent: content,
+            aiGeneratedContent: content as any,
             status: 'DRAFT'
           },
           include: {
@@ -77,11 +79,6 @@ export async function POST(request: NextRequest) {
     )
 
     return NextResponse.json({ posts })
-  } catch (error) {
-    console.error('Content generation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate content' },
-      { status: 500 }
-    )
-  }
-}
+  }),
+  contentGenerationRateLimit
+)

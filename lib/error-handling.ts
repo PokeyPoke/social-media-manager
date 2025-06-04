@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 
@@ -208,9 +208,9 @@ function handlePrismaError(error: Prisma.PrismaClientKnownRequestError): AppErro
 
 // Async wrapper for route handlers
 export function asyncHandler(
-  handler: (request: Request, context?: any) => Promise<Response>
+  handler: (request: NextRequest, context?: any) => Promise<NextResponse>
 ) {
-  return async (request: Request, context?: any) => {
+  return async (request: NextRequest, context?: any) => {
     try {
       return await handler(request, context)
     } catch (error) {

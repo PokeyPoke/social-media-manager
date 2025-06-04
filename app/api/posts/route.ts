@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/db'
+import { withRateLimit, apiRateLimit } from '@/lib/rate-limiting'
+import { asyncHandler, AuthenticationError } from '@/lib/error-handling'
 import { z } from 'zod'
 
 const getPostsSchema = z.object({
@@ -11,11 +13,11 @@ const getPostsSchema = z.object({
   offset: z.number().min(0).default(0)
 })
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const session = await getSession()
     if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new AuthenticationError()
     }
 
     const { searchParams } = new URL(request.url)
@@ -78,11 +80,6 @@ export async function GET(request: NextRequest) {
         hasMore: totalCount > (validatedParams.offset + validatedParams.limit)
       }
     })
-  } catch (error) {
-    console.error('Get posts error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch posts' },
-      { status: 500 }
-    )
-  }
-}
+  }),
+  apiRateLimit
+)

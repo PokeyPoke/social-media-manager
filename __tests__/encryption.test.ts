@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import { encrypt, decrypt, secureCompare, generateSecureToken } from '@/lib/encryption-fixed'
+import { encrypt, decrypt, secureCompare, generateSecureToken } from '@/lib/encryption'
 
 const originalEnv = process.env
 

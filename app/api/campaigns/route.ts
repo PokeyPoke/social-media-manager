@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/db'
+import { withRateLimit, apiRateLimit } from '@/lib/rate-limiting'
+import { asyncHandler, AuthenticationError, NotFoundError } from '@/lib/error-handling'
 import { z } from 'zod'
 
 const createCampaignSchema = z.object({
@@ -24,11 +26,11 @@ const createCampaignSchema = z.object({
   })
 })
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const session = await getSession()
     if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new AuthenticationError()
     }
 
     const { searchParams } = new URL(request.url)
@@ -54,20 +56,15 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({ campaigns })
-  } catch (error) {
-    console.error('Get campaigns error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch campaigns' },
-      { status: 500 }
-    )
-  }
-}
+  }),
+  apiRateLimit
+)
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withRateLimit(
+  asyncHandler(async (request: NextRequest) => {
     const session = await getSession()
     if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new AuthenticationError()
     }
 
     const body = await request.json()
@@ -79,7 +76,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!company) {
-      return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+      throw new NotFoundError('Company')
     }
 
     const campaign = await prisma.campaign.create({
@@ -103,11 +100,6 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ campaign })
-  } catch (error: any) {
-    console.error('Create campaign error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create campaign' },
-      { status: 500 }
-    )
-  }
-}
+  }),
+  apiRateLimit
+)
