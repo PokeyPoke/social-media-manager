@@ -1,8 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from './db'
-// import { env } from './env-validation'
-// Temporarily use process.env directly for build compatibility
+import { env } from './env-validation-safe'
 import { User } from '@prisma/client'
 import { NextRequest } from 'next/server'
 
@@ -61,7 +60,7 @@ export function generateToken(
       type,
       jti 
     }, 
-    process.env.JWT_SECRET!, 
+    env.JWT_SECRET, 
     { 
       expiresIn: TOKEN_EXPIRY[type.toUpperCase() as keyof typeof TOKEN_EXPIRY],
       issuer: 'social-media-manager',
@@ -72,7 +71,7 @@ export function generateToken(
 
 export function verifyToken(token: string, expectedType?: TokenType): AuthTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
+    const decoded = jwt.verify(token, env.JWT_SECRET, {
       issuer: 'social-media-manager',
       audience: 'social-media-manager-users'
     }) as AuthTokenPayload & { type: TokenType, jti: string }

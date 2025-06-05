@@ -2,10 +2,14 @@
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --omit=dev --no-audit"]
 
 [phases.build]
 cmds = ["npm run build"]
+
+[variables]
+NODE_OPTIONS = "--max-old-space-size=512"
+NPM_CONFIG_PRODUCTION = "false"
 
 [start]
 cmd = "npm start"
