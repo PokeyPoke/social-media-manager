@@ -59,7 +59,7 @@ async function checkDatabase(): Promise<ServiceHealth> {
   const startTime = Date.now()
   
   try {
-    await withTimeout(prisma.$queryRaw`SELECT 1`, 5000, 'Database query timeout')
+    await withTimeout(prisma.$queryRaw`SELECT 1`, 2000, 'Database query timeout')
     
     const responseTime = Date.now() - startTime
     
@@ -69,6 +69,15 @@ async function checkDatabase(): Promise<ServiceHealth> {
       lastChecked: new Date().toISOString()
     }
   } catch (error) {
+    // During startup, database might not be ready yet
+    if (process.uptime && process.uptime() < 60) {
+      return {
+        status: 'degraded',
+        error: 'Database warming up',
+        lastChecked: new Date().toISOString()
+      }
+    }
+    
     return {
       status: 'unhealthy',
       error: error instanceof Error ? error.message : 'Unknown database error',
@@ -84,7 +93,7 @@ async function checkAI(): Promise<ServiceHealth> {
   try {
     const isHealthy = await withTimeout(
       geminiAI.testConnection(),
-      10000,
+      3000,
       'AI service timeout'
     )
     
@@ -113,7 +122,7 @@ async function checkFacebook(): Promise<ServiceHealth> {
     // In production, you might want to test with a valid token
     const response = await withTimeout(
       fetch('https://graph.facebook.com/v18.0/', { method: 'GET' }),
-      5000,
+      2000,
       'Facebook API timeout'
     )
     
