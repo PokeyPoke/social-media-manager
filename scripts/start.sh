@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e  # Exit on any error
 
-echo "🚀 Starting application..."
+echo "🚀 Starting application v2.0 - FRESH DEPLOYMENT..."
 
 # Set memory optimization for Node.js
 export NODE_OPTIONS="--max-old-space-size=512"
