@@ -7,12 +7,9 @@ echo "🚀 Starting application..."
 export NODE_OPTIONS="--max-old-space-size=512"
 
 # Always ensure database is in sync
-echo "📦 Running database migrations..."
-timeout 60 npx prisma migrate deploy || {
-  echo "⚠️  Migration deploy failed, trying db push as fallback..."
-  timeout 60 npx prisma db push --force-reset
-}
-echo "✅ Migrations completed successfully"
+echo "📦 Ensuring database schema is up to date..."
+timeout 60 npx prisma db push
+echo "✅ Database schema synchronized successfully"
 
 # Generate Prisma client if needed
 echo "🔧 Ensuring Prisma client is generated..."
