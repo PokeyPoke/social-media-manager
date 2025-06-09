@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth'
 import { createSession } from '@/lib/session'
-import { withRateLimit, authRateLimit } from '@/lib/rate-limiting'
-import { asyncHandler } from '@/lib/error-handling'
-import { z } from 'zod'
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6)
-})
+import { loginSchema, validateBody, sanitizeInput } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
     const clientIP = request.headers.get('x-forwarded-for') || 'unknown'
     console.log(`Login attempt from ${clientIP}`)
 
-    const body = await request.json()
-    const { email, password } = loginSchema.parse(body)
+    // Validate request body
+    const validation = await validateBody(loginSchema)(request)
+    if (validation instanceof NextResponse) {
+      return validation // Return validation error response
+    }
+    
+    // Sanitize input data
+    const sanitizedData = sanitizeInput(validation.data)
+    const { email, password } = sanitizedData
 
     console.log(`Authenticating user: ${email}`)
     const user = await authenticateUser(email, password)

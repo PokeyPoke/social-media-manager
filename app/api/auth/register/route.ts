@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUser } from '@/lib/auth'
 import { createSession } from '@/lib/session'
-import { withRateLimit, authRateLimit } from '@/lib/rate-limiting'
-import { asyncHandler } from '@/lib/error-handling'
-import { z } from 'zod'
-
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().min(2),
-  role: z.enum(['ADMIN', 'MANAGER', 'VIEWER']).optional()
-})
+import { registerSchema, validateBody, sanitizeInput } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
-    // Simple rate limiting check
     const clientIP = request.headers.get('x-forwarded-for') || 'unknown'
     console.log(`Registration attempt from ${clientIP}`)
 
-    const body = await request.json()
-    const { email, password, name, role = 'MANAGER' } = registerSchema.parse(body)
+    // Validate request body
+    const validation = await validateBody(registerSchema)(request)
+    if (validation instanceof NextResponse) {
+      return validation // Return validation error response
+    }
+    
+    // Sanitize input data
+    const sanitizedData = sanitizeInput(validation.data)
+    const { email, password, name, role } = sanitizedData
 
     console.log(`Creating user: ${email}`)
     const user = await createUser(email, password, name, role)
