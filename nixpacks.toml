@@ -6,6 +6,7 @@ cmds = ["npm ci --omit=dev --no-audit"]
 
 [phases.build]
 cmds = [
+  "rm -rf node_modules/.prisma",
   "npx prisma generate",
   "npm run build"
 ]
