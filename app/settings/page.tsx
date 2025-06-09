@@ -5,7 +5,7 @@ import SettingsClient from './settings-client'
 export default async function SettingsPage() {
   const session = await getSession()
   
-  if (!session.isLoggedIn) {
+  if (!session.isLoggedIn || !session.user) {
     redirect('/auth/login')
   }
 

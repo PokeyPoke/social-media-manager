@@ -30,7 +30,10 @@ export const createCompanySchema = z.object({
     targetAudience: z.string().min(10).max(500),
     brandColors: z.array(z.string().regex(/^#[0-9A-F]{6}$/i)).optional(),
     keywords: z.array(z.string().min(1).max(50)).max(20).optional()
-  }).default({}),
+  }).default({
+    voice: 'professional',
+    targetAudience: 'General audience'
+  }),
   defaultInstructions: z.string().max(1000).optional(),
   timezone: z.string().default('UTC')
 })
