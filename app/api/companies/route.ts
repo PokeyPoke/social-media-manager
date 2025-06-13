@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/session'
+import { withAuthenticatedMiddleware } from '@/lib/middleware'
 import { prisma } from '@/lib/db'
 import { facebookAPI } from '@/lib/facebook'
 import { z } from 'zod'
@@ -19,45 +19,27 @@ const createCompanySchema = z.object({
   timezone: z.string().default('UTC')
 })
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const companies = await prisma.company.findMany({
-      include: {
-        campaigns: {
-          take: 5,
-          orderBy: { createdAt: 'desc' }
-        },
-        _count: {
-          select: {
-            campaigns: true
-          }
-        }
+export const GET = withAuthenticatedMiddleware(async (request: NextRequest, context?: any) => {
+  const companies = await prisma.company.findMany({
+    include: {
+      campaigns: {
+        take: 5,
+        orderBy: { createdAt: 'desc' }
       },
-      orderBy: { createdAt: 'desc' }
-    })
+      _count: {
+        select: {
+          campaigns: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
 
-    return NextResponse.json({ companies })
-  } catch (error) {
-    console.error('Get companies error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch companies' },
-      { status: 500 }
-    )
-  }
-}
+  return NextResponse.json({ companies })
+})
 
-export async function POST(request: NextRequest) {
+export const POST = withAuthenticatedMiddleware(async (request: NextRequest, context?: any) => {
   try {
-    const session = await getSession()
-    if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
     const data = createCompanySchema.parse(body)
 
@@ -102,6 +84,13 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Create company error:', error)
     
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      )
+    }
+    
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Facebook page already connected to another company' },
@@ -110,8 +99,8 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: 'Failed to create company' },
+      { error: error.message || 'Failed to create company' },
       { status: 500 }
     )
   }
-}
+})

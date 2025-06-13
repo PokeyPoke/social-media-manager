@@ -37,39 +37,20 @@ export default function AnalyticsClient() {
 
   const fetchAnalytics = async () => {
     try {
-      // Since we don't have real analytics data yet, let's simulate it
-      // In a real app, this would fetch from /api/analytics
-      
-      setTimeout(() => {
-        setAnalytics({
-          totalPosts: 24,
-          totalEngagement: 1847,
-          averageEngagement: 76.9,
-          topPerformingPost: {
-            id: '1',
-            text: 'Exciting news about our latest product launch! 🚀',
-            engagement: 342,
-            company: 'TechCorp'
-          },
-          recentMetrics: [
-            { date: '2024-12-01', posts: 3, engagement: 156 },
-            { date: '2024-12-02', posts: 2, engagement: 98 },
-            { date: '2024-12-03', posts: 4, engagement: 203 },
-            { date: '2024-12-04', posts: 1, engagement: 67 },
-            { date: '2024-12-05', posts: 3, engagement: 189 },
-            { date: '2024-12-06', posts: 2, engagement: 134 },
-            { date: '2024-12-07', posts: 3, engagement: 178 }
-          ],
-          companyBreakdown: [
-            { company: 'TechCorp', posts: 12, engagement: 892 },
-            { company: 'RetailPlus', posts: 8, engagement: 634 },
-            { company: 'FoodieDelight', posts: 4, engagement: 321 }
-          ]
-        })
-        setLoading(false)
-      }, 1000)
+      const response = await fetch(`/api/analytics?days=${dateRange}`, {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics')
+      }
+
+      const data = await response.json()
+      setAnalytics(data)
     } catch (error) {
       console.error('Error fetching analytics:', error)
+      setAnalytics(null)
+    } finally {
       setLoading(false)
     }
   }

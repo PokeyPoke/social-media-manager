@@ -11,14 +11,15 @@ export default function AddCompanyForm() {
   const [formData, setFormData] = useState({
     name: '',
     facebookPageId: '',
+    pageAccessToken: '',
     defaultInstructions: '',
     timezone: 'UTC',
     brandSettings: {
-      primaryColor: '#3B82F6',
-      secondaryColor: '#6B7280',
+      voice: 'professional',
       tone: 'professional',
       targetAudience: '',
-      keywords: ''
+      contentThemes: [] as string[],
+      postingGuidelines: ''
     }
   })
 
@@ -31,13 +32,7 @@ export default function AddCompanyForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          ...formData,
-          brandSettings: {
-            ...formData.brandSettings,
-            keywords: formData.brandSettings.keywords.split(',').map(k => k.trim()).filter(Boolean)
-          }
-        }),
+        body: JSON.stringify(formData),
       })
 
       if (!response.ok) {
@@ -45,8 +40,8 @@ export default function AddCompanyForm() {
         throw new Error(error.error || 'Failed to create company')
       }
 
-      const company = await response.json()
-      router.push(`/companies/${company.id}`)
+      const data = await response.json()
+      router.push(`/companies/${data.company.id}`)
     } catch (error) {
       console.error('Error creating company:', error)
       alert(error instanceof Error ? error.message : 'Failed to create company')
@@ -60,13 +55,23 @@ export default function AddCompanyForm() {
     
     if (name.startsWith('brandSettings.')) {
       const brandKey = name.split('.')[1]
-      setFormData(prev => ({
-        ...prev,
-        brandSettings: {
-          ...prev.brandSettings,
-          [brandKey]: value
-        }
-      }))
+      if (brandKey === 'contentThemes') {
+        setFormData(prev => ({
+          ...prev,
+          brandSettings: {
+            ...prev.brandSettings,
+            contentThemes: value.split(',').map(t => t.trim()).filter(Boolean)
+          }
+        }))
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          brandSettings: {
+            ...prev.brandSettings,
+            [brandKey]: value
+          }
+        }))
+      }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
     }
@@ -135,22 +140,42 @@ export default function AddCompanyForm() {
           </div>
 
           {/* Facebook Integration */}
-          <div>
-            <label htmlFor="facebookPageId" className="block text-sm font-medium text-gray-700">
-              Facebook Page ID
-            </label>
-            <input
-              type="text"
-              name="facebookPageId"
-              id="facebookPageId"
-              value={formData.facebookPageId}
-              onChange={handleInputChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Optional - can be configured later"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              The Facebook Page ID for automated posting (optional)
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="facebookPageId" className="block text-sm font-medium text-gray-700">
+                Facebook Page ID
+              </label>
+              <input
+                type="text"
+                name="facebookPageId"
+                id="facebookPageId"
+                value={formData.facebookPageId}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter your Facebook Page ID"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Found in your Facebook Page settings
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="pageAccessToken" className="block text-sm font-medium text-gray-700">
+                Page Access Token
+              </label>
+              <input
+                type="password"
+                name="pageAccessToken"
+                id="pageAccessToken"
+                value={formData.pageAccessToken}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter your Page Access Token"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Long-lived page access token from Facebook
+              </p>
+            </div>
           </div>
 
           {/* Brand Settings */}
@@ -159,13 +184,13 @@ export default function AddCompanyForm() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="brandSettings.tone" className="block text-sm font-medium text-gray-700">
-                  Brand Tone
+                <label htmlFor="brandSettings.voice" className="block text-sm font-medium text-gray-700">
+                  Brand Voice
                 </label>
                 <select
-                  name="brandSettings.tone"
-                  id="brandSettings.tone"
-                  value={formData.brandSettings.tone}
+                  name="brandSettings.voice"
+                  id="brandSettings.voice"
+                  value={formData.brandSettings.voice}
                   onChange={handleInputChange}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 >
@@ -173,41 +198,77 @@ export default function AddCompanyForm() {
                   <option value="casual">Casual</option>
                   <option value="friendly">Friendly</option>
                   <option value="authoritative">Authoritative</option>
-                  <option value="playful">Playful</option>
                 </select>
               </div>
 
               <div>
-                <label htmlFor="brandSettings.targetAudience" className="block text-sm font-medium text-gray-700">
-                  Target Audience
+                <label htmlFor="brandSettings.tone" className="block text-sm font-medium text-gray-700">
+                  Brand Tone
                 </label>
                 <input
                   type="text"
-                  name="brandSettings.targetAudience"
-                  id="brandSettings.targetAudience"
-                  value={formData.brandSettings.targetAudience}
+                  name="brandSettings.tone"
+                  id="brandSettings.tone"
+                  value={formData.brandSettings.tone}
                   onChange={handleInputChange}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="e.g., Young professionals, Parents, Tech enthusiasts"
+                  placeholder="e.g., Professional, Inspiring, Helpful"
                 />
               </div>
             </div>
 
             <div className="mt-6">
-              <label htmlFor="brandSettings.keywords" className="block text-sm font-medium text-gray-700">
-                Brand Keywords
+              <label htmlFor="brandSettings.targetAudience" className="block text-sm font-medium text-gray-700">
+                Target Audience *
               </label>
               <input
                 type="text"
-                name="brandSettings.keywords"
-                id="brandSettings.keywords"
-                value={formData.brandSettings.keywords}
+                name="brandSettings.targetAudience"
+                id="brandSettings.targetAudience"
+                required
+                value={formData.brandSettings.targetAudience}
                 onChange={handleInputChange}
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="innovation, quality, sustainability (comma-separated)"
+                placeholder="e.g., Young professionals aged 25-35 interested in technology"
               />
               <p className="mt-1 text-sm text-gray-500">
-                Comma-separated keywords that represent the brand
+                Detailed description of your target audience
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <label htmlFor="brandSettings.contentThemes" className="block text-sm font-medium text-gray-700">
+                Content Themes
+              </label>
+              <input
+                type="text"
+                name="brandSettings.contentThemes"
+                id="brandSettings.contentThemes"
+                value={formData.brandSettings.contentThemes.join(', ')}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="innovation, sustainability, customer success (comma-separated)"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Main themes for content generation (comma-separated)
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <label htmlFor="brandSettings.postingGuidelines" className="block text-sm font-medium text-gray-700">
+                Posting Guidelines
+              </label>
+              <textarea
+                name="brandSettings.postingGuidelines"
+                id="brandSettings.postingGuidelines"
+                rows={3}
+                value={formData.brandSettings.postingGuidelines}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="e.g., Always include a call-to-action, Use emojis sparingly, Avoid controversial topics"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Specific guidelines for content creation
               </p>
             </div>
           </div>

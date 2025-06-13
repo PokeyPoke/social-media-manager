@@ -126,9 +126,8 @@ export class FacebookAPI {
     return decrypt(encryptedToken)
   }
 
-  async testConnection(pageId: string, encryptedToken: string): Promise<boolean> {
+  async testConnection(pageId: string, token: string): Promise<boolean> {
     try {
-      const token = this.decryptToken(encryptedToken)
       const pageInfo = await this.getPageInfo(pageId, token)
       return !!pageInfo.id
     } catch (error) {
