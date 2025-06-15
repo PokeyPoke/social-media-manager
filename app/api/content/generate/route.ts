@@ -16,13 +16,14 @@ const generateContentSchema = z.object({
 
 export const POST = withRateLimit(
   asyncHandler(async (request: NextRequest) => {
-    const session = await getSession()
-    if (!session.isLoggedIn) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    try {
+      const session = await getSession()
+      if (!session.isLoggedIn) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
 
-    const body = await request.json()
-    const data = generateContentSchema.parse(body)
+      const body = await request.json()
+      const data = generateContentSchema.parse(body)
 
     // Get campaign and company details
     const campaign = await prisma.campaign.findUnique({
@@ -78,7 +79,15 @@ export const POST = withRateLimit(
       )
     )
 
-    return NextResponse.json({ posts })
+      return NextResponse.json({ posts })
+    } catch (error: any) {
+      console.error('Content generation error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+      throw error
+    }
   }),
   contentGenerationRateLimit
 )
