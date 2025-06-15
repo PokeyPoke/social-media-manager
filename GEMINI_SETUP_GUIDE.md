@@ -30,13 +30,14 @@ After deployment (1-2 minutes), test by creating content:
 
 ## Free Tier Limits
 
-### Gemini 1.5 Flash (Recommended - Already configured)
-- **15,000 requests per day** (free)
-- **1,000 requests per minute**
+### Gemini 2.0 Flash (Latest Model - Now configured)
+- **1 million tokens per minute** (free)
+- **15 million tokens per day** (free)
+- Latest and most capable model
 - Perfect for social media content generation
 - Fast response times
 
-### Gemini Pro (Alternative)
+### Gemini Pro (Fallback)
 - 60 requests per day (very limited)
 - 60 requests per minute
 
@@ -61,7 +62,7 @@ Check Railway logs for:
 
 ```bash
 curl -X POST \
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=YOUR_API_KEY" \
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
     "contents": [{

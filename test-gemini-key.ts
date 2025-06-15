@@ -13,11 +13,11 @@ async function testGeminiKey(apiKey: string) {
   console.log(`Length: ${apiKey.length} characters\n`)
   
   try {
-    // Test with gemini-1.5-flash (better quotas)
-    console.log('Testing gemini-1.5-flash model...')
+    // Test with gemini-2.0-flash (latest model)
+    console.log('Testing gemini-2.0-flash model...')
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       generationConfig: {
         temperature: 0.9,
         topK: 40,
