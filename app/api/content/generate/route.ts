@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/db'
-import { geminiAI } from '@/lib/gemini'
+import { contentGenerator } from '@/lib/content-generator'
 import { withRateLimit, contentGenerationRateLimit } from '@/lib/rate-limiting'
 import { asyncHandler } from '@/lib/error-handling'
 import { z } from 'zod'
@@ -53,23 +53,11 @@ export const POST = asyncHandler(async (request: NextRequest) => {
       customInstructions: data.customInstructions || campaign.company.defaultInstructions || undefined
     }
 
-    // Generate content variations
-    let generatedContent
-    try {
-      generatedContent = await geminiAI.generateMultipleVariations(
-        generationRequest,
-        data.count
-      )
-    } catch (aiError: any) {
-      console.error('Gemini AI failed, using fallback:', aiError.message)
-      
-      // Use fallback content generation
-      const { geminiFallback } = await import('@/lib/gemini-fallback')
-      generatedContent = await geminiFallback.generateMultipleVariations(
-        generationRequest,
-        data.count
-      )
-    }
+    // Generate content variations using template-based generator
+    const generatedContent = await contentGenerator.generateMultipleVariations(
+      generationRequest,
+      data.count
+    )
 
     // Create posts in database with DRAFT status
     const posts = await Promise.all(
