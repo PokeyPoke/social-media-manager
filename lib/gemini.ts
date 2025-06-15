@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateFallbackContent, generateMultipleFallbackContent } from './content-templates'
 
 export interface ContentGenerationRequest {
   companyName: string
@@ -18,18 +19,35 @@ export interface GeneratedContent {
   suggestedImagePrompt?: string
   tone: string
   estimatedEngagement: 'low' | 'medium' | 'high'
+  generationMethod?: 'ai' | 'fallback'
 }
 
 export class GeminiAI {
-  private client: GoogleGenerativeAI
-  private model: any
+  private client: GoogleGenerativeAI | null = null
+  private model: any = null
+  private useFallback: boolean = false
 
   constructor() {
-    this.client = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!)
-    this.model = this.client.getGenerativeModel({ model: 'gemini-pro' })
+    try {
+      if (process.env.GOOGLE_GEMINI_API_KEY) {
+        this.client = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
+        this.model = this.client.getGenerativeModel({ model: 'gemini-pro' })
+      } else {
+        console.warn('Gemini API key not found, using fallback content generation')
+        this.useFallback = true
+      }
+    } catch (error) {
+      console.error('Failed to initialize Gemini AI:', error)
+      this.useFallback = true
+    }
   }
 
   async generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
+    // Use fallback if Gemini is not available or on error
+    if (this.useFallback) {
+      return this.generateFallbackContent(request)
+    }
+
     const prompt = this.buildPrompt(request)
     
     try {
@@ -37,10 +55,20 @@ export class GeminiAI {
       const response = await result.response
       const text = response.text()
       
-      return this.parseResponse(text, request)
-    } catch (error) {
+      const content = this.parseResponse(text, request)
+      return { ...content, generationMethod: 'ai' }
+    } catch (error: any) {
       console.error('Gemini AI generation error:', error)
-      throw new Error('Failed to generate content')
+      
+      // Check if it's a quota or rate limit error
+      if (error.message?.includes('quota') || error.message?.includes('429') || error.message?.includes('limit')) {
+        console.warn('Gemini API quota exceeded, using fallback content')
+        return this.generateFallbackContent(request)
+      }
+      
+      // For other errors, try fallback
+      console.warn('Gemini API error, using fallback content')
+      return this.generateFallbackContent(request)
     }
   }
 
@@ -48,11 +76,19 @@ export class GeminiAI {
     request: ContentGenerationRequest, 
     count: number = 3
   ): Promise<GeneratedContent[]> {
-    const variations = await Promise.all(
-      Array(count).fill(0).map(() => this.generateContent(request))
-    )
-    
-    return variations
+    if (this.useFallback) {
+      return this.generateMultipleFallbackContent(request, count)
+    }
+
+    try {
+      const variations = await Promise.all(
+        Array(count).fill(0).map(() => this.generateContent(request))
+      )
+      return variations
+    } catch (error) {
+      console.error('Failed to generate multiple variations:', error)
+      return this.generateMultipleFallbackContent(request, count)
+    }
   }
 
   async improveContent(
@@ -164,6 +200,10 @@ export class GeminiAI {
   }
 
   async testConnection(): Promise<boolean> {
+    if (this.useFallback) {
+      return true // Fallback is always available
+    }
+
     try {
       const result = await this.model.generateContent('Test prompt: Say "Hello, API is working!"')
       const response = await result.response
@@ -173,6 +213,72 @@ export class GeminiAI {
       console.error('Gemini AI connection test failed:', error)
       return false
     }
+  }
+
+  private generateFallbackContent(request: ContentGenerationRequest): GeneratedContent {
+    const template = generateFallbackContent(
+      request.postType,
+      request.contentTheme,
+      request.targetAudience,
+      request.companyName,
+      request.includeEmojis,
+      request.includeHashtags
+    )
+
+    // Apply custom instructions if provided
+    let message = template.message
+    if (request.customInstructions) {
+      message += `\n\n${request.customInstructions}`
+    }
+
+    // Trim to max length if specified
+    if (request.maxLength && message.length > request.maxLength) {
+      message = message.substring(0, request.maxLength - 3) + '...'
+    }
+
+    return {
+      message,
+      hashtags: template.hashtags,
+      suggestedImagePrompt: `Professional image for ${request.companyName} about ${request.contentTheme}`,
+      tone: template.tone,
+      estimatedEngagement: 'medium',
+      generationMethod: 'fallback'
+    }
+  }
+
+  private generateMultipleFallbackContent(
+    request: ContentGenerationRequest,
+    count: number
+  ): GeneratedContent[] {
+    const templates = generateMultipleFallbackContent(
+      request.postType,
+      request.contentTheme,
+      request.targetAudience,
+      request.companyName,
+      count,
+      request.includeEmojis,
+      request.includeHashtags
+    )
+
+    return templates.map(template => {
+      let message = template.message
+      if (request.customInstructions) {
+        message += `\n\n${request.customInstructions}`
+      }
+
+      if (request.maxLength && message.length > request.maxLength) {
+        message = message.substring(0, request.maxLength - 3) + '...'
+      }
+
+      return {
+        message,
+        hashtags: template.hashtags,
+        suggestedImagePrompt: `Professional image for ${request.companyName} about ${request.contentTheme}`,
+        tone: template.tone,
+        estimatedEngagement: 'medium' as const,
+        generationMethod: 'fallback' as const
+      }
+    })
   }
 }
 
