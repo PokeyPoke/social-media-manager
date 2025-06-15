@@ -1,7 +1,5 @@
+import { GoogleGenAI } from '@google/genai'
 import { generateFallbackContent, generateMultipleFallbackContent } from './content-templates'
-
-// Dynamic import to avoid build issues
-let GoogleGenerativeAI: any
 
 export interface ContentGenerationRequest {
   companyName: string
@@ -21,26 +19,19 @@ export interface GeneratedContent {
   suggestedImagePrompt?: string
   tone: string
   estimatedEngagement: 'low' | 'medium' | 'high'
-  generationMethod?: 'ai' | 'fallback'
+  generationMethod?: 'ai' | 'fallback' | 'template'
 }
 
 export class GeminiAI {
-  private client: GoogleGenerativeAI | null = null
-  private model: any = null
+  private client: GoogleGenAI | null = null
   private useFallback: boolean = false
 
   constructor() {
     this.initialize()
   }
 
-  private async initialize() {
+  private initialize() {
     try {
-      // Dynamic import
-      if (!GoogleGenerativeAI) {
-        const module = await import('@google/generative-ai')
-        GoogleGenerativeAI = module.GoogleGenerativeAI
-      }
-
       const apiKey = process.env.GOOGLE_GEMINI_API_KEY
       
       if (!apiKey || apiKey === 'your-api-key-here' || apiKey.length < 30) {
@@ -52,26 +43,8 @@ export class GeminiAI {
         return
       }
 
-      this.client = new GoogleGenerativeAI(apiKey)
-      
-      // Try models in order of preference
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']
-      
-      for (const modelName of models) {
-        try {
-          this.model = this.client.getGenerativeModel({ model: modelName })
-          console.log(`Gemini AI initialized with ${modelName} model`)
-          break // Success, stop trying other models
-        } catch (error: any) {
-          console.warn(`Failed to load ${modelName}:`, error.message)
-          if (modelName === models[models.length - 1]) {
-            // Last model failed
-            console.error('Failed to load any Gemini model')
-            this.useFallback = true
-            return
-          }
-        }
-      }
+      this.client = new GoogleGenAI({ apiKey })
+      console.log('Gemini AI initialized successfully with @google/genai')
     } catch (error) {
       console.error('Failed to initialize Gemini AI:', error)
       this.useFallback = true
@@ -79,31 +52,27 @@ export class GeminiAI {
   }
 
   async generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
-    // Ensure initialization is complete
-    if (!this.client && !this.useFallback) {
-      await this.initialize()
-    }
-
-    // Use fallback if Gemini is not available or on error
-    if (this.useFallback || !this.model) {
+    // Use fallback if Gemini is not available
+    if (this.useFallback || !this.client) {
       return this.generateFallbackContent(request)
     }
 
     const prompt = this.buildPrompt(request)
     
     try {
-      const result = await this.model.generateContent(prompt)
-      const response = await result.response
-      const text = response.text()
+      const response = await this.client.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt
+      })
       
+      const text = response.text || ''
       const content = this.parseResponse(text, request)
       return { ...content, generationMethod: 'ai' }
     } catch (error: any) {
       console.error('Gemini AI generation error:', {
         message: error.message,
         name: error.name,
-        stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-        response: error.response?.data
+        stack: error.stack?.split('\n').slice(0, 3).join('\n')
       })
       
       // Check if it's a quota or rate limit error
@@ -116,6 +85,7 @@ export class GeminiAI {
       if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
         console.error('Gemini API key is invalid!')
         console.error('Please check your GOOGLE_GEMINI_API_KEY in Railway')
+        this.useFallback = true
         return this.generateFallbackContent(request)
       }
       
@@ -149,6 +119,18 @@ export class GeminiAI {
     improvements: string[],
     brandContext: ContentGenerationRequest
   ): Promise<GeneratedContent> {
+    if (this.useFallback || !this.client) {
+      // Simple improvement - just return the original with minor changes
+      return {
+        message: originalContent + '\n\n' + improvements.join(' '),
+        hashtags: ['improved', 'content'],
+        tone: brandContext.brandVoice,
+        suggestedImagePrompt: `Image for ${brandContext.companyName}`,
+        estimatedEngagement: 'medium',
+        generationMethod: 'fallback'
+      }
+    }
+
     const prompt = `
     Improve the following social media post based on these specific requests:
     
@@ -175,10 +157,12 @@ export class GeminiAI {
     `
 
     try {
-      const result = await this.model.generateContent(prompt)
-      const response = await result.response
-      const text = response.text()
+      const response = await this.client.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt
+      })
       
+      const text = response.text || ''
       return this.parseResponse(text, brandContext)
     } catch (error) {
       console.error('Content improvement error:', error)
@@ -234,7 +218,7 @@ export class GeminiAI {
         }
       }
     } catch (error) {
-      console.warn('Failed to parse JSON response, using fallback')
+      console.warn('Failed to parse JSON response, using fallback parsing')
     }
 
     // Fallback parsing if JSON extraction fails
@@ -257,10 +241,16 @@ export class GeminiAI {
       return true // Fallback is always available
     }
 
+    if (!this.client) {
+      return false
+    }
+
     try {
-      const result = await this.model.generateContent('Test prompt: Say "Hello, API is working!"')
-      const response = await result.response
-      const text = response.text()
+      const response = await this.client.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: 'Test prompt: Say "Hello, API is working!"'
+      })
+      const text = response.text || ''
       return text.includes('Hello') || text.includes('working')
     } catch (error) {
       console.error('Gemini AI connection test failed:', error)

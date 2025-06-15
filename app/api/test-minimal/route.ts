@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     // Test 1: Check if we can import the module
     results.tests.moduleImport = 'starting'
-    const module = await import('@google/generative-ai')
+    const module = await import('@google/genai')
     results.tests.moduleImport = 'success'
     results.tests.moduleExports = Object.keys(module)
     
@@ -18,14 +18,18 @@ export async function GET(request: NextRequest) {
     results.tests.apiKeyLength = apiKey.length
     
     try {
-      const { GoogleGenerativeAI } = module
-      const genAI = new GoogleGenerativeAI(apiKey)
+      const { GoogleGenAI } = module
+      const genAI = new GoogleGenAI({ apiKey })
       results.tests.instanceCreation = 'success'
       
-      // Test 3: Can we get a model?
+      // Test 3: Can we make a simple request?
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+        const response = await genAI.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: 'Say hello'
+        })
         results.tests.modelCreation = 'success'
+        results.tests.responseText = response.text ? response.text.substring(0, 50) : 'no text'
       } catch (modelError: any) {
         results.tests.modelCreation = {
           error: modelError.message,

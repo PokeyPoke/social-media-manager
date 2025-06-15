@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/db'
-import { contentGenerator } from '@/lib/content-generator'
-import { withRateLimit, contentGenerationRateLimit } from '@/lib/rate-limiting'
-import { asyncHandler } from '@/lib/error-handling'
+import { geminiAI } from '@/lib/gemini'
 import { z } from 'zod'
 
 const generateContentSchema = z.object({
@@ -14,16 +12,24 @@ const generateContentSchema = z.object({
   count: z.number().min(1).max(5).default(1)
 })
 
-// Temporarily remove rate limiting to debug
-export const POST = asyncHandler(async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
+  console.log('Content generation POST request received')
+  
   try {
+    // Check authentication
     const session = await getSession()
     if (!session.isLoggedIn) {
+      console.log('Authentication failed - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    console.log('Authentication successful')
 
-      const body = await request.json()
-      const data = generateContentSchema.parse(body)
+    // Parse request body
+    const body = await request.json()
+    console.log('Request body parsed:', body)
+    
+    const data = generateContentSchema.parse(body)
+    console.log('Schema validation passed:', data)
 
     // Get campaign and company details
     const campaign = await prisma.campaign.findUnique({
@@ -34,11 +40,13 @@ export const POST = asyncHandler(async (request: NextRequest) => {
     })
 
     if (!campaign) {
+      console.log('Campaign not found:', data.campaignId)
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
     }
+    console.log('Campaign found:', campaign.id, campaign.name)
 
-    const brandSettings = campaign.company.brandSettings as any
-    const contentStrategy = campaign.contentStrategy as any
+    const brandSettings = campaign.company.brandSettings as any || {}
+    const contentStrategy = campaign.contentStrategy as any || {}
 
     // Prepare content generation request
     const generationRequest = {
@@ -52,12 +60,14 @@ export const POST = asyncHandler(async (request: NextRequest) => {
       maxLength: contentStrategy.maxLength || 280,
       customInstructions: data.customInstructions || campaign.company.defaultInstructions || undefined
     }
+    console.log('Generation request prepared:', generationRequest)
 
-    // Generate content variations using template-based generator
-    const generatedContent = await contentGenerator.generateMultipleVariations(
+    // Generate content variations using Gemini AI
+    const generatedContent = await geminiAI.generateMultipleVariations(
       generationRequest,
       data.count
     )
+    console.log('Content generated successfully:', generatedContent.length, 'variations')
 
     // Create posts in database with DRAFT status
     const posts = await Promise.all(
@@ -78,15 +88,26 @@ export const POST = asyncHandler(async (request: NextRequest) => {
         })
       )
     )
+    console.log('Posts created in database:', posts.length)
 
-      return NextResponse.json({ posts })
-    } catch (error: any) {
-      console.error('Content generation error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      })
-      throw error
-    }
+    return NextResponse.json({ posts })
+    
+  } catch (error: any) {
+    console.error('Content generation error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause
+    })
+    
+    // Return a proper error response instead of throwing
+    return NextResponse.json(
+      { 
+        error: 'Content generation failed', 
+        details: error.message,
+        timestamp: new Date().toISOString()
+      }, 
+      { status: 500 }
+    )
   }
-)
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { withAuthenticatedMiddleware } from '@/lib/middleware'
 
 export const GET = withAuthenticatedMiddleware(async (request: NextRequest, context?: any) => {
@@ -24,29 +24,25 @@ export const GET = withAuthenticatedMiddleware(async (request: NextRequest, cont
     results.apiKeyLength = apiKey.length
 
     // Initialize Gemini
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    const genAI = new GoogleGenAI({ apiKey })
     results.modelStatus = 'initialized'
 
     // Test with simple prompt
     const testPrompt = 'Respond with exactly: "API is working"'
-    const result = await model.generateContent(testPrompt)
-    const response = await result.response
-    const text = response.text()
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: testPrompt
+    })
+    const text = result.text || ''
     
     results.testPromptStatus = text.includes('working') ? 'success' : 'unexpected_response'
     
     // Test content generation capability
-    const contentTest = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: 'Generate a one-sentence social media post about technology.'
-        }]
-      }]
+    const contentTest = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: 'Generate a one-sentence social media post about technology.'
     })
-    const contentResponse = await contentTest.response
-    const contentText = contentResponse.text()
+    const contentText = contentTest.text || ''
     
     return NextResponse.json({
       ...results,

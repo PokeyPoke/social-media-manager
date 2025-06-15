@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (apiKey && apiKey !== 'your-gemini-api-key') {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -52,38 +52,30 @@ export async function GET(request: NextRequest) {
     
     // Try SDK import
     try {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai')
+      const { GoogleGenAI } = await import('@google/genai')
       results.checks.sdkImport = 'success'
       
       // Try SDK initialization
       if (apiKey && apiKey !== 'your-gemini-api-key') {
         try {
-          const genAI = new GoogleGenerativeAI(apiKey)
+          const genAI = new GoogleGenAI({ apiKey })
           results.checks.sdkInit = 'success'
           
-          // Try model creation
+          // Try generation
           try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
-            results.checks.modelCreation = 'success'
-            
-            // Try generation
-            try {
-              const result = await model.generateContent('Say hello')
-              const response = await result.response
-              const text = response.text()
-              results.checks.generation = {
-                success: true,
-                responseLength: text.length
-              }
-            } catch (genError: any) {
-              results.checks.generation = {
-                error: genError.message,
-                stack: genError.stack?.split('\n').slice(0, 3)
-              }
+            const result = await genAI.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: 'Say hello'
+            })
+            const text = result.text || ''
+            results.checks.generation = {
+              success: true,
+              responseLength: text.length
             }
-          } catch (modelError: any) {
-            results.checks.modelCreation = {
-              error: modelError.message
+          } catch (genError: any) {
+            results.checks.generation = {
+              error: genError.message,
+              stack: genError.stack?.split('\n').slice(0, 3)
             }
           }
         } catch (initError: any) {
