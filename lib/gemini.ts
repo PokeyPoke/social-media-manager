@@ -29,13 +29,30 @@ export class GeminiAI {
 
   constructor() {
     try {
-      if (process.env.GOOGLE_GEMINI_API_KEY) {
-        this.client = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-        this.model = this.client.getGenerativeModel({ model: 'gemini-pro' })
-      } else {
-        console.warn('Gemini API key not found, using fallback content generation')
+      const apiKey = process.env.GOOGLE_GEMINI_API_KEY
+      
+      if (!apiKey || apiKey === 'your-api-key-here' || apiKey.length < 30) {
+        console.warn('Valid Gemini API key not found, using fallback content generation')
+        console.warn('To enable AI content generation:')
+        console.warn('1. Get API key from: https://makersuite.google.com/app/apikey')
+        console.warn('2. Set GOOGLE_GEMINI_API_KEY in Railway environment variables')
         this.useFallback = true
+        return
       }
+
+      this.client = new GoogleGenerativeAI(apiKey)
+      // Use gemini-1.5-flash for better quotas (15K daily requests vs 60)
+      this.model = this.client.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        generationConfig: {
+          temperature: 0.9,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        }
+      })
+      
+      console.log('Gemini AI initialized with gemini-1.5-flash model')
     } catch (error) {
       console.error('Failed to initialize Gemini AI:', error)
       this.useFallback = true
