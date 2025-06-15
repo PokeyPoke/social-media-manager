@@ -41,28 +41,23 @@ export class GeminiAI {
       }
 
       this.client = new GoogleGenerativeAI(apiKey)
-      // Use gemini-2.0-flash - the latest model
-      try {
-        this.model = this.client.getGenerativeModel({ 
-          model: 'gemini-2.0-flash',
-          generationConfig: {
-            temperature: 0.9,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          }
-        })
-        console.log('Gemini AI initialized with gemini-2.0-flash model')
-      } catch (modelError) {
-        console.error('Failed to load gemini-2.0-flash model:', modelError)
-        // Try older model as fallback
+      
+      // Try models in order of preference
+      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']
+      
+      for (const modelName of models) {
         try {
-          this.model = this.client.getGenerativeModel({ model: 'gemini-pro' })
-          console.log('Fallback: Gemini AI initialized with gemini-pro model')
-        } catch (fallbackError) {
-          console.error('Failed to load any Gemini model:', fallbackError)
-          this.useFallback = true
-          return
+          this.model = this.client.getGenerativeModel({ model: modelName })
+          console.log(`Gemini AI initialized with ${modelName} model`)
+          break // Success, stop trying other models
+        } catch (error: any) {
+          console.warn(`Failed to load ${modelName}:`, error.message)
+          if (modelName === models[models.length - 1]) {
+            // Last model failed
+            console.error('Failed to load any Gemini model')
+            this.useFallback = true
+            return
+          }
         }
       }
     } catch (error) {

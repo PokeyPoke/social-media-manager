@@ -32,37 +32,46 @@ Requirements:
   "tone": "describe the tone"
 }`
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.9,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          }
-        })
+  // Try multiple models in order
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro']
+  let lastError: any = null
+  
+  for (const model of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.9,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 1024,
+            }
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        lastError = new Error(`${model}: ${error.error?.message || response.statusText}`)
+        console.warn(`Model ${model} failed:`, lastError.message)
+        continue // Try next model
       }
-    )
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(`Gemini API error: ${error.error?.message || response.statusText}`)
-    }
-
-    const data = await response.json()
-    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      // Success! Process the response
+      const data = await response.json()
+      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      console.log(`Successfully used model: ${model}`)
     
     // Try to parse JSON from response
     try {
@@ -82,18 +91,24 @@ Requirements:
       // Fallback if JSON parsing fails
     }
 
-    // Fallback parsing
-    return {
-      message: generatedText.substring(0, 280),
-      hashtags: request.includeHashtags ? ['SocialMedia', 'Business', 'Innovation'] : [],
-      tone: 'professional',
-      suggestedImagePrompt: `Image for ${request.companyName} about ${request.contentTheme}`,
-      estimatedEngagement: 'medium',
-      generationMethod: 'ai'
+      // Fallback parsing
+      return {
+        message: generatedText.substring(0, 280),
+        hashtags: request.includeHashtags ? ['SocialMedia', 'Business', 'Innovation'] : [],
+        tone: 'professional',
+        suggestedImagePrompt: `Image for ${request.companyName} about ${request.contentTheme}`,
+        estimatedEngagement: 'medium',
+        generationMethod: 'ai'
+      }
+      
+    } catch (error: any) {
+      lastError = error
+      console.warn(`Model ${model} error:`, error.message)
+      // Continue to next model
     }
-
-  } catch (error: any) {
-    console.error('Direct Gemini API call failed:', error.message)
-    throw error
   }
+  
+  // All models failed
+  console.error('All Gemini models failed:', lastError?.message)
+  throw lastError || new Error('Failed to generate content with any Gemini model')
 }
