@@ -54,10 +54,39 @@ export const POST = asyncHandler(async (request: NextRequest) => {
     }
 
     // Generate content variations
-    const generatedContent = await geminiAI.generateMultipleVariations(
-      generationRequest,
-      data.count
-    )
+    let generatedContent
+    try {
+      generatedContent = await geminiAI.generateMultipleVariations(
+        generationRequest,
+        data.count
+      )
+    } catch (aiError: any) {
+      console.error('AI generation failed, checking if we can use direct API:', aiError.message)
+      
+      // Try direct API call as last resort
+      if (process.env.GOOGLE_GEMINI_API_KEY && process.env.GOOGLE_GEMINI_API_KEY !== 'your-gemini-api-key') {
+        const { generateWithGeminiAPI } = await import('@/lib/gemini-simple')
+        try {
+          const singleContent = await generateWithGeminiAPI(
+            process.env.GOOGLE_GEMINI_API_KEY,
+            {
+              companyName: campaign.company.name,
+              contentTheme: data.contentTheme,
+              targetAudience: brandSettings.targetAudience || 'general audience',
+              postType: data.postType,
+              includeHashtags: contentStrategy.includeHashtags !== false,
+              customInstructions: data.customInstructions
+            }
+          )
+          generatedContent = [singleContent]
+        } catch (directError) {
+          console.error('Direct API also failed:', directError)
+          throw aiError // Throw original error
+        }
+      } else {
+        throw aiError
+      }
+    }
 
     // Create posts in database with DRAFT status
     const posts = await Promise.all(
