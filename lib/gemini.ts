@@ -1,5 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { generateFallbackContent, generateMultipleFallbackContent } from './content-templates'
+
+// Dynamic import to avoid build issues
+let GoogleGenerativeAI: any
 
 export interface ContentGenerationRequest {
   companyName: string
@@ -28,7 +30,17 @@ export class GeminiAI {
   private useFallback: boolean = false
 
   constructor() {
+    this.initialize()
+  }
+
+  private async initialize() {
     try {
+      // Dynamic import
+      if (!GoogleGenerativeAI) {
+        const module = await import('@google/generative-ai')
+        GoogleGenerativeAI = module.GoogleGenerativeAI
+      }
+
       const apiKey = process.env.GOOGLE_GEMINI_API_KEY
       
       if (!apiKey || apiKey === 'your-api-key-here' || apiKey.length < 30) {
@@ -67,8 +79,13 @@ export class GeminiAI {
   }
 
   async generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
+    // Ensure initialization is complete
+    if (!this.client && !this.useFallback) {
+      await this.initialize()
+    }
+
     // Use fallback if Gemini is not available or on error
-    if (this.useFallback) {
+    if (this.useFallback || !this.model) {
       return this.generateFallbackContent(request)
     }
 
