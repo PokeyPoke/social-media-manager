@@ -41,18 +41,29 @@ export class GeminiAI {
       }
 
       this.client = new GoogleGenerativeAI(apiKey)
-      // Use gemini-1.5-flash for better quotas (15K daily requests vs 60)
-      this.model = this.client.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
-        generationConfig: {
-          temperature: 0.9,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
+      // Try gemini-pro first, fall back to flash if needed
+      try {
+        this.model = this.client.getGenerativeModel({ model: 'gemini-pro' })
+        console.log('Gemini AI initialized with gemini-pro model')
+      } catch (modelError) {
+        console.warn('Failed to load gemini-pro, trying gemini-1.5-flash')
+        try {
+          this.model = this.client.getGenerativeModel({ 
+            model: 'gemini-1.5-flash',
+            generationConfig: {
+              temperature: 0.9,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 1024,
+            }
+          })
+          console.log('Gemini AI initialized with gemini-1.5-flash model')
+        } catch (flashError) {
+          console.error('Failed to load any Gemini model:', flashError)
+          this.useFallback = true
+          return
         }
-      })
-      
-      console.log('Gemini AI initialized with gemini-1.5-flash model')
+      }
     } catch (error) {
       console.error('Failed to initialize Gemini AI:', error)
       this.useFallback = true
@@ -75,7 +86,12 @@ export class GeminiAI {
       const content = this.parseResponse(text, request)
       return { ...content, generationMethod: 'ai' }
     } catch (error: any) {
-      console.error('Gemini AI generation error:', error)
+      console.error('Gemini AI generation error:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        response: error.response?.data
+      })
       
       // Check if it's a quota or rate limit error
       if (error.message?.includes('quota') || error.message?.includes('429') || error.message?.includes('limit')) {
@@ -83,8 +99,15 @@ export class GeminiAI {
         return this.generateFallbackContent(request)
       }
       
+      // Check for API key issues
+      if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
+        console.error('Gemini API key is invalid!')
+        console.error('Please check your GOOGLE_GEMINI_API_KEY in Railway')
+        return this.generateFallbackContent(request)
+      }
+      
       // For other errors, try fallback
-      console.warn('Gemini API error, using fallback content')
+      console.warn(`Gemini API error (${error.message}), using fallback content`)
       return this.generateFallbackContent(request)
     }
   }

@@ -14,13 +14,13 @@ const generateContentSchema = z.object({
   count: z.number().min(1).max(5).default(1)
 })
 
-export const POST = withRateLimit(
-  asyncHandler(async (request: NextRequest) => {
-    try {
-      const session = await getSession()
-      if (!session.isLoggedIn) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+// Temporarily remove rate limiting to debug
+export const POST = asyncHandler(async (request: NextRequest) => {
+  try {
+    const session = await getSession()
+    if (!session.isLoggedIn) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
       const body = await request.json()
       const data = generateContentSchema.parse(body)
@@ -88,6 +88,5 @@ export const POST = withRateLimit(
       })
       throw error
     }
-  }),
-  contentGenerationRateLimit
+  }
 )
